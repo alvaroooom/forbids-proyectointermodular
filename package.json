@@ -1,0 +1,24 @@
+{
+  "name": "forbids-proyectointermodular",
+  "version": "1.0.0",
+  "description": "Proyecto intermodular de Desarrollo de Aplicaciones Web: aplicación web de compraventa de segunda mano que combina publicación de productos, interacción social (likes y comentarios) y subastas",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alvaroooom/forbids-proyectointermodular.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/alvaroooom/forbids-proyectointermodular/issues"
+  },
+  "homepage": "https://github.com/alvaroooom/forbids-proyectointermodular#readme",
+  "dependencies": {
+    "bootstrap": "^5.3.8"
+  }
+}
