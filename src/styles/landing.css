@@ -1,0 +1,117 @@
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background-color: #f8fbff;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1 0 auto; /* Empuja el footer al fondo si hay poco contenido */
+}
+
+.main-footer {
+  flex-shrink: 0;
+  background-color: #0b1426;
+  color: #94a3b8;
+  padding: 60px 0 30px 0;
+}
+
+.hero-section {
+  padding: 80px 0;
+}
+
+.hero-title {
+  font-size: 3.5rem;
+  font-weight: 700;
+  color: #1a1e23;
+}
+
+.hero-subtitle {
+  color: #6c757d;
+  max-width: 600px;
+  margin: 0 auto 30px auto;
+}
+
+.btn.btn-primary-custom {
+  background-color: #2563eb;
+  border: none;
+  padding: 12px 30px;
+  font-weight: 600;
+  border-radius: 8px;
+  color: white;
+  transition: all 0.3s ease;
+}
+
+.btn.btn-primary-custom:hover {
+  background-color: darkblue;
+  color: white;
+}
+
+.btn.btn-outline-custom {
+  color: #2563eb;
+  border: 2px solid #2563eb;
+  padding: 12px 30px;
+  border-radius: 8px;
+  background-color: transparent;
+  transition: all 0.3s ease;
+}
+
+.btn.btn-outline-custom:hover {
+  background-color: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
+
+.feature-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px auto;
+  font-size: 1.5rem;
+}
+
+.bg-social {
+  background-color: #e0e7ff;
+  color: #4338ca;
+}
+.bg-community {
+  background-color: #dcfce7;
+  color: #15803d;
+}
+.bg-fast {
+  background-color: #f3e8ff;
+  color: #7e22ce;
+}
+
+.btn-help-float {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  color: #0b1426;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  border: none;
+  z-index: 1050;
+  transition: transform 0.2s;
+}
+
+.btn-help-float:hover {
+  transform: scale(1.1);
+}

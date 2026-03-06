@@ -2,8 +2,12 @@
   "name": "forbids-proyectointermodular",
   "version": "1.0.0",
   "description": "Proyecto intermodular de Desarrollo de Aplicaciones Web: aplicación web de compraventa de segunda mano que combina publicación de productos, interacción social (likes y comentarios) y subastas",
-  "main": "index.js",
+  "type": "module",
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "format": "prettier --write \"src/**/*.{jsx,js,css}\" \"index.html\" \"vite.config.js\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -13,12 +17,19 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "bugs": {
     "url": "https://github.com/alvaroooom/forbids-proyectointermodular/issues"
   },
   "homepage": "https://github.com/alvaroooom/forbids-proyectointermodular#readme",
   "dependencies": {
-    "bootstrap": "^5.3.8"
+    "bootstrap": "^5.3.8",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.0",
+    "prettier": "^3.8.1",
+    "vite": "^5.0.0"
   }
 }
