@@ -11,10 +11,10 @@ Proyecto intermodular de Desarrollo de Aplicaciones Web: aplicación web de comp
 - **Bootstrap 5** - Framework CSS para diseño responsive
 - **Prettier** - Formateador de código
 
-### Backend (Próximamente)
+### Backend
 - **Spring Boot** - Framework Java
 - **JPA/Hibernate** - ORM para base de datos
-- **MySQL/PostgreSQL** - Base de datos
+- **MySQL** - Base de datos
 
 ## 📋 Requisitos Previos
 
@@ -50,36 +50,6 @@ npm run preview
 npm run format
 ```
 
-## 📁 Estructura del Proyecto
-
-```
-forbids-proyectointermodular/
-├── src/
-│   ├── pages/                 # Componentes de páginas
-│   │   ├── Landing.jsx       # Página de inicio
-│   │   ├── Home.jsx          # Dashboard
-│   │   ├── Login.jsx         # Iniciar sesión
-│   │   ├── Register.jsx      # Registro
-│   │   ├── Profile.jsx       # Perfil de usuario
-│   │   ├── PrivacyPolicy.jsx # Política de privacidad
-│   │   └── TermsConditions.jsx
-│   ├── components/            # Componentes reutilizables
-│   │   └── Footer.jsx        # Footer compartido
-│   ├── styles/               # Estilos CSS
-│   │   ├── landing.css
-│   │   ├── home.css
-│   │   └── auth.css
-│   ├── App.jsx               # Componente principal con routing
-│   ├── main.jsx              # Punto de entrada
-│   └── index.css             # Estilos globales
-├── index.html                # HTML principal
-├── vite.config.js            # Configuración de Vite
-├── package.json              # Dependencias y scripts
-├── .prettierrc                # Configuración de Prettier
-└── .gitignore                # Archivos excluidos de Git
-
-```
-
 ## 🎨 Características Actuales
 
 ✅ Landing page con hero section
@@ -102,30 +72,5 @@ forbids-proyectointermodular/
 🔲 Chat en tiempo real
 🔲 Dashboard de vendedor
 
-## 📝 Notas Importantes
-
-- El proyecto está migrado desde HTML vanilla a React
-- Bootstrap se importa globalmente en `src/main.jsx`
-- Utiliza React Router v6 para navegación
-- El servidor Vite incluye Hot Module Replacement (HMR)
-
-## 👨‍💻 Contribución
-
-Para contribuir al proyecto:
-1. Crea una rama para tu feature: `git checkout -b feature/AmazingFeature`
-2. Commit tus cambios: `git commit -m 'Add some AmazingFeature'`
-3. Push a la rama: `git push origin feature/AmazingFeature`
-4. Abre un Pull Request
-
-## 📄 Licencia
-
-ISC - Ver archivo LICENSE para más detalles
-
-## 📞 Contacto
-
-Para preguntas o sugerencias sobre el proyecto, abre un issue en el repositorio de GitHub.
-
----
-
 **Estado del Proyecto:** 🚧 En desarrollo
-**Última actualización:** Febrero 2026
+**Última actualización:** Marzo 2026

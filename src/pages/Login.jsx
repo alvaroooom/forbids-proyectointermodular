@@ -1,7 +1,57 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import "../styles/auth.css";
+import { saveAuthSession } from "../utils/auth";
 
 export default function Login() {
+  const navigate = useNavigate();
+  const [credentials, setCredentials] = useState({
+    username: "",
+    password: "",
+  });
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setCredentials((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setErrorMessage("");
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("http://localhost:8080/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: credentials.username.trim(),
+          password: credentials.password,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.message || "No se pudo iniciar sesión");
+      }
+
+      saveAuthSession(data);
+      navigate("/home");
+    } catch (error) {
+      setErrorMessage(error.message || "Error inesperado al iniciar sesión");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="main-content d-flex flex-column">
       <nav className="navbar navbar-light bg-transparent py-3">
@@ -30,19 +80,23 @@ export default function Login() {
                 </p>
               </div>
 
-              <form>
+              <form onSubmit={handleSubmit}>
                 <div className="mb-3">
                   <label className="form-label small fw-600">
-                    Correo electrónico
+                    Usuario o correo
                   </label>
                   <div className="input-group">
                     <span className="input-group-text bg-white border-end-0 text-muted">
-                      <i className="bi bi-envelope"></i>
+                      <i className="bi bi-person"></i>
                     </span>
                     <input
-                      type="email"
+                      name="username"
+                      type="text"
                       className="form-control border-start-0 ps-0"
-                      placeholder="tu@email.com"
+                      placeholder="juan_perez o tu@email.com"
+                      value={credentials.username}
+                      onChange={handleChange}
+                      required
                     />
                   </div>
                 </div>
@@ -54,9 +108,13 @@ export default function Login() {
                       <i className="bi bi-lock"></i>
                     </span>
                     <input
+                      name="password"
                       type="password"
                       className="form-control border-start-0 ps-0"
                       placeholder="••••••••"
+                      value={credentials.password}
+                      onChange={handleChange}
+                      required
                     />
                   </div>
                 </div>
@@ -70,11 +128,18 @@ export default function Login() {
                   </a>
                 </div>
 
+                {errorMessage && (
+                  <div className="alert alert-danger small py-2" role="alert">
+                    {errorMessage}
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   className="btn btn-primary-custom w-100 py-2 mb-3"
+                  disabled={isSubmitting}
                 >
-                  Iniciar sesión
+                  {isSubmitting ? "Iniciando..." : "Iniciar sesión"}
                 </button>
               </form>
 

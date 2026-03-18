@@ -29,11 +29,11 @@ body {
 .hero-title {
   font-size: 3.5rem;
   font-weight: 700;
-  color: #1a1e23;
+  color: var(--text-primary);
 }
 
 .hero-subtitle {
-  color: #6c757d;
+  color: var(--text-secondary);
   max-width: 600px;
   margin: 0 auto 30px auto;
 }

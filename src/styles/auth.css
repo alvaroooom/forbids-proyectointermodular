@@ -48,6 +48,13 @@ body {
 .login-card {
   border-radius: 20px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .login-card {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
 }
 
 .input-group-text {
