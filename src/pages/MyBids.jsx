@@ -1,77 +1,34 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import "../styles/home.css";
-import { clearAuthSession, fetchCurrentUser, getAuthSession } from "../utils/auth";
+import { api } from "../utils/api";
+import { useAuth } from "../context/AuthContext";
 import { formatAuctionEndDate, isAuctionClosed, isAuctionUrgent } from "../utils/auctionTime";
 import { getCategoryLabel, getCategoryBadgeClass } from "../utils/categories";
 import Navbar from "../components/Navbar";
 import LiveCountdown from "../components/LiveCountdown";
 
 export default function MyBids() {
-  const navigate = useNavigate();
-  const [currentUser, setCurrentUser] = useState(null);
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const { currentUser } = useAuth();
   const [products, setProducts] = useState([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sortBy, setSortBy] = useState("default");
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const validateSession = async () => {
-      try {
-        const user = await fetchCurrentUser();
-        if (isMounted) {
-          setCurrentUser(user);
-        }
-      } catch {
-        clearAuthSession();
-        if (isMounted) {
-          navigate("/login");
-        }
-      } finally {
-        if (isMounted) {
-          setIsCheckingSession(false);
-        }
-      }
-    };
-
-    validateSession();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [navigate]);
 
   useEffect(() => {
     if (!currentUser) return;
 
     const loadMyBids = async () => {
       setIsLoadingProducts(true);
-      const session = getAuthSession();
-      
-      if (!session?.token) {
-        setIsLoadingProducts(false);
-        return;
-      }
-
+      setLoadError("");
       try {
-        const response = await fetch("http://localhost:8080/api/bids/my-bids", {
-          headers: {
-            Authorization: `Bearer ${session.token}`,
-          },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setProducts(data);
-        } else {
-          console.error("Error al cargar mis pujas");
-        }
+        const data = await api.get("/api/bids/my-bids", { auth: true });
+        setProducts(data);
       } catch (error) {
-        console.error("Error:", error);
+        setLoadError(error.message || "No se pudieron cargar tus pujas");
+        setProducts([]);
       } finally {
         setIsLoadingProducts(false);
       }
@@ -80,12 +37,8 @@ export default function MyBids() {
     loadMyBids();
   }, [currentUser]);
 
-  if (isCheckingSession) {
-    return (
-      <div className="main-content d-flex justify-content-center align-items-center">
-        <p className="text-muted mb-0">Comprobando sesión...</p>
-      </div>
-    );
+  if (!currentUser) {
+    return null;
   }
 
   const filteredProducts = products.filter((product) => {
@@ -124,15 +77,14 @@ export default function MyBids() {
 
   return (
     <div className="main-content">
-      <Navbar
-        currentUser={currentUser}
-        onLogout={() => {
-          clearAuthSession();
-          navigate("/login");
-        }}
-      />
+      <Navbar currentUser={currentUser} />
 
       <div className="container py-5">
+        {loadError && (
+          <div className="alert alert-danger" role="alert">
+            {loadError}
+          </div>
+        )}
         <div className="d-flex justify-content-between align-items-center mb-3">
           <h2 className="h4 fw-bold mb-0">Mis Pujas</h2>
           <span className="text-muted small">{sortedProducts.length} productos</span>

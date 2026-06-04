@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, Navigate } from "react-router-dom";
 import "../styles/auth.css";
+import { api } from "../utils/api";
 import { saveAuthSession } from "../utils/auth";
+import { useAuth } from "../context/AuthContext";
 
 export default function Register() {
   const navigate = useNavigate();
+  const { refreshUser, currentUser, isLoading } = useAuth();
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -40,32 +43,29 @@ export default function Register() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("http://localhost:8080/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username: formData.username.trim(),
-          email: formData.email.trim(),
-          password: formData.password,
-        }),
+      const data = await api.post("/api/auth/register", {
+        username: formData.username.trim(),
+        email: formData.email.trim(),
+        password: formData.password,
       });
 
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data.message || "No se pudo completar el registro");
-      }
-
       saveAuthSession(data);
+      await refreshUser();
       navigate("/home");
     } catch (error) {
-      setErrorMessage(error.message || "Error inesperado al registrarse");
+      if (error instanceof TypeError) {
+        setErrorMessage("No se pudo conectar con el servidor. Comprueba que el backend esté en marcha (puerto 8080).");
+      } else {
+        setErrorMessage(error.message || "Error inesperado al registrarse");
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  if (!isLoading && currentUser) {
+    return <Navigate to="/home" replace />;
+  }
 
   return (
     <div className="main-content d-flex flex-column">

@@ -34,6 +34,9 @@ public class User {
     @Column(nullable = false)
     private Role role = Role.USER;
 
+    @Column(nullable = false)
+    private boolean banned = false;
+
     public User() {
     }
 
@@ -89,5 +92,13 @@ public class User {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public boolean isBanned() {
+        return banned;
+    }
+
+    public void setBanned(boolean banned) {
+        this.banned = banned;
     }
 }

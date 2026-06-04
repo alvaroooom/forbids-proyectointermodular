@@ -55,6 +55,102 @@ body {
   padding: 40px 0 30px 0;
 }
 
+.site-footer {
+  flex-shrink: 0;
+  margin-top: auto;
+  background: linear-gradient(
+    180deg,
+    var(--bg-secondary) 0%,
+    color-mix(in srgb, var(--bg-primary) 88%, var(--text-primary) 12%) 100%
+  );
+  border-top: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.footer-brand {
+  display: inline-flex;
+  align-items: center;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.footer-tagline {
+  max-width: 22rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.footer-heading {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+}
+
+.footer-links li + li {
+  margin-top: 0.55rem;
+}
+
+.footer-links a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.footer-links a:hover {
+  color: #0d6efd;
+}
+
+.footer-social {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  background: var(--card-bg);
+  text-decoration: none;
+  transition: transform 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.footer-social:hover {
+  color: #0d6efd;
+  border-color: #0d6efd;
+  transform: translateY(-1px);
+}
+
+.footer-note {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.footer-bottom {
+  border-top: 1px solid var(--border-color);
+}
+
+.legal-page section + section {
+  padding-top: 0.25rem;
+}
+
+.legal-page h2 {
+  color: var(--text-primary);
+}
+
+.legal-page a {
+  color: #0d6efd;
+}
+
+[data-theme="dark"] .site-footer {
+  background: linear-gradient(180deg, #0b1426 0%, #070b14 100%);
+  border-top-color: #1f2937;
+}
+
 [data-theme="dark"] .main-footer {
   background-color: #0b1426;
   color: #94a3b8;

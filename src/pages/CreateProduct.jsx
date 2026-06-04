@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { clearAuthSession, fetchCurrentUser, getAuthSession } from "../utils/auth";
+import { api } from "../utils/api";
+import { useAuth } from "../context/AuthContext";
+import ImageUploadField from "../components/ImageUploadField";
 import "../styles/home.css";
 
 export default function CreateProduct() {
   const navigate = useNavigate();
-  const [currentUser, setCurrentUser] = useState(null);
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const { currentUser } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [formData, setFormData] = useState({
@@ -17,34 +18,6 @@ export default function CreateProduct() {
     durationMinutes: "60",
     category: "OTHER",
   });
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const validateSession = async () => {
-      try {
-        const user = await fetchCurrentUser();
-        if (isMounted) {
-          setCurrentUser(user);
-        }
-      } catch {
-        clearAuthSession();
-        if (isMounted) {
-          navigate("/login");
-        }
-      } finally {
-        if (isMounted) {
-          setIsCheckingSession(false);
-        }
-      }
-    };
-
-    validateSession();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [navigate]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -60,32 +33,18 @@ export default function CreateProduct() {
     setIsSubmitting(true);
 
     try {
-      const session = getAuthSession();
-      if (!session?.token) {
-        throw new Error("Tu sesión ha caducado, vuelve a iniciar sesión");
-      }
-
-      const response = await fetch("http://localhost:8080/api/products", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.token}`,
-        },
-        body: JSON.stringify({
+      await api.post(
+        "/api/products",
+        {
           title: formData.title.trim(),
           description: formData.description.trim(),
           startingPrice: Number(formData.startingPrice),
           imageUrl: formData.imageUrl.trim() || null,
           durationMinutes: Number(formData.durationMinutes),
           category: formData.category,
-        }),
-      });
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data.message || "No se pudo publicar el producto");
-      }
+        },
+        { auth: true }
+      );
 
       navigate("/home");
     } catch (error) {
@@ -95,12 +54,8 @@ export default function CreateProduct() {
     }
   };
 
-  if (isCheckingSession) {
-    return (
-      <div className="main-content d-flex justify-content-center align-items-center">
-        <p className="text-muted mb-0">Comprobando sesión...</p>
-      </div>
-    );
+  if (!currentUser) {
+    return null;
   }
 
   return (
@@ -190,21 +145,12 @@ export default function CreateProduct() {
                 />
               </div>
 
-              <div className="mb-4">
-                <label className="form-label small fw-600">URL de imagen (opcional)</label>
-                <input
-                  type="url"
-                  name="imageUrl"
-                  className="form-control"
-                  placeholder="https://ejemplo.com/imagen.jpg"
-                  value={formData.imageUrl}
-                  onChange={handleChange}
-                  maxLength={500}
-                />
-                <div className="form-text">
-                  Si lo dejas vacío, ForBids asignará una imagen random automáticamente.
-                </div>
-              </div>
+              <ImageUploadField
+                label="Imagen del producto (opcional)"
+                value={formData.imageUrl}
+                onChange={(url) => setFormData((prev) => ({ ...prev, imageUrl: url }))}
+                helperText="Si lo dejas vacío, ForBids asignará una imagen aleatoria automáticamente."
+              />
 
               <div className="mb-4">
                 <label className="form-label small fw-600">Duración (minutos)</label>

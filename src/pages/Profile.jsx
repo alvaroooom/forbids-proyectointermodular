@@ -1,11 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import "../styles/home.css";
-import { clearAuthSession, fetchCurrentUser, getAuthSession, saveAuthSession } from "../utils/auth";
+import { api } from "../utils/api";
+import { clearAuthSession, getAuthSession, saveAuthSession } from "../utils/auth";
+import { useAuth } from "../context/AuthContext";
 import { formatAuctionEndDate, isAuctionClosed, isAuctionUrgent } from "../utils/auctionTime";
 import { getCategoryLabel, getCategoryBadgeClass } from "../utils/categories";
 import Navbar from "../components/Navbar";
 import LiveCountdown from "../components/LiveCountdown";
+import ProfileHeader from "../components/profile/ProfileHeader";
+import ProfileStatisticsTab from "../components/profile/ProfileStatisticsTab";
+import ProfileSettingsTab from "../components/profile/ProfileSettingsTab";
+import ImageUploadField from "../components/ImageUploadField";
 
 export default function Profile() {
   const PAGE_SIZE_OPTIONS = [15, 30, 60];
@@ -34,8 +40,7 @@ export default function Profile() {
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [currentUser, setCurrentUser] = useState(null);
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const { currentUser, setCurrentUser, refreshUser } = useAuth();
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "products");
   
   // Estados para la pestaña de productos
@@ -79,63 +84,29 @@ export default function Profile() {
   }, [searchParams]);
 
   useEffect(() => {
-    let isMounted = true;
+    if (!currentUser) {
+      return;
+    }
 
-    const validateSession = async () => {
-      try {
-        const user = await fetchCurrentUser();
-        if (isMounted) {
-          setCurrentUser(user);
-          setProfileData({
-            username: user.username || "",
-            email: user.email || "",
-            currentPassword: "",
-            newPassword: "",
-            profileImageUrl: user.profileImageUrl || "",
-          });
-        }
-      } catch {
-        clearAuthSession();
-        if (isMounted) {
-          navigate("/login");
-        }
-      } finally {
-        if (isMounted) {
-          setIsCheckingSession(false);
-        }
-      }
-    };
-
-    validateSession();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [navigate]);
+    setProfileData({
+      username: currentUser.username || "",
+      email: currentUser.email || "",
+      currentPassword: "",
+      newPassword: "",
+      profileImageUrl: currentUser.profileImageUrl || "",
+    });
+  }, [currentUser]);
 
   useEffect(() => {
-    if (activeTab !== "favorites" || !currentUser) return;
+    if (!currentUser) return;
 
     let isMounted = true;
     setIsLoadingFavorites(true);
     setFavoritesError("");
 
     const loadFavorites = async () => {
-      const session = getAuthSession();
-      if (!session?.token) return;
-
       try {
-        const response = await fetch("http://localhost:8080/api/favorites", {
-          headers: {
-            Authorization: `Bearer ${session.token}`,
-          },
-        });
-
-        const data = await response.json().catch(() => []);
-
-        if (!response.ok) {
-          throw new Error(data.message || "Error al cargar favoritos");
-        }
+        const data = await api.get("/api/favorites", { auth: true });
 
         if (isMounted) {
           setFavorites(Array.isArray(data) ? data : []);
@@ -156,7 +127,7 @@ export default function Profile() {
     return () => {
       isMounted = false;
     };
-  }, [activeTab, currentUser]);
+  }, [currentUser]);
 
   useEffect(() => {
     if (activeTab !== "statistics" || !currentUser) return;
@@ -166,21 +137,8 @@ export default function Profile() {
     setStatisticsError("");
 
     const loadStatistics = async () => {
-      const session = getAuthSession();
-      if (!session?.token) return;
-
       try {
-        const response = await fetch("http://localhost:8080/api/statistics/me", {
-          headers: {
-            Authorization: `Bearer ${session.token}`,
-          },
-        });
-
-        const data = await response.json().catch(() => null);
-
-        if (!response.ok) {
-          throw new Error(data?.message || "Error al cargar estadísticas");
-        }
+        const data = await api.get("/api/statistics/me", { auth: true });
 
         if (isMounted) {
           setStatistics(data);
@@ -222,21 +180,9 @@ export default function Profile() {
       setProductsError("");
 
       try {
-        const response = await fetch(
-          `http://localhost:8080/api/products/mine?status=${statusFilter}`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${session.token}`,
-            },
-          }
-        );
-
-        const data = await response.json().catch(() => []);
-
-        if (!response.ok) {
-          throw new Error(data.message || "No se pudieron cargar tus subastas");
-        }
+        const data = await api.get(`/api/products/mine?status=${statusFilter}`, {
+          auth: true,
+        });
 
         if (isMounted) {
           setMyProducts(Array.isArray(data) ? data : []);
@@ -325,22 +271,8 @@ export default function Profile() {
         return;
       }
 
-      const response = await fetch("http://localhost:8080/api/auth/profile", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.token}`,
-        },
-        body: JSON.stringify(updateData),
-      });
+      const data = await api.put("/api/auth/profile", updateData, { auth: true });
 
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data.message || "Error al actualizar perfil");
-      }
-
-      // Persistir sesión actualizada (misma clave/almacenamiento en toda la app)
       if (data.token) {
         saveAuthSession(data);
       }
@@ -350,6 +282,7 @@ export default function Profile() {
         username: data.username,
         email: data.email,
         profileImageUrl: data.profileImageUrl,
+        role: data.role || currentUser?.role || "USER",
       });
 
       setProfileData({
@@ -371,6 +304,10 @@ export default function Profile() {
   const avatarInitials = currentUser?.username
     ? currentUser.username.slice(0, 2).toUpperCase()
     : "FB";
+
+  const switchTab = (tab) => {
+    navigate(`/profile?tab=${tab}`);
+  };
 
   const minPriceValue = Number(minPrice);
   const maxPriceValue = Number(maxPrice);
@@ -459,12 +396,8 @@ export default function Profile() {
     setJumpPage(String(targetPage));
   };
 
-  if (isCheckingSession) {
-    return (
-      <div className="main-content d-flex justify-content-center align-items-center">
-        <p className="text-muted mb-0">Comprobando sesión...</p>
-      </div>
-    );
+  if (!currentUser) {
+    return null;
   }
 
   return (
@@ -472,95 +405,68 @@ export default function Profile() {
       <Navbar currentUser={currentUser} />
 
       <div className="container py-5">
-        <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
-          <div className="d-flex align-items-center gap-3">
-            {currentUser?.profileImageUrl ? (
-              <img 
-                src={currentUser.profileImageUrl} 
-                alt={currentUser.username}
-                className="rounded-circle shadow-sm"
-                style={{ 
-                  width: '100px', 
-                  height: '100px', 
-                  objectFit: 'cover',
-                  border: '4px solid #fff',
-                  boxShadow: '0 0 0 2px #0d6efd'
-                }}
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
-                }}
-              />
-            ) : null}
-            <div
-              className="rounded-circle bg-primary text-white fw-bold shadow-sm"
-              style={{
-                width: '100px',
-                height: '100px',
-                fontSize: '32px',
-                display: currentUser?.profileImageUrl ? 'none' : 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '4px solid #fff',
-                boxShadow: '0 0 0 2px #0d6efd',
-              }}
-            >
-              {avatarInitials}
-            </div>
-            <div>
-              <h1 className="h4 fw-bold mb-1">{currentUser?.username}</h1>
-              <p className="text-muted mb-2">{currentUser?.email}</p>
-              <div className="d-flex gap-3">
-                <span className="badge bg-light text-dark border">
-                  <i className="bi bi-bag me-1"></i>
-                  {activeProducts.length} productos
-                </span>
-                <span className="badge bg-light text-dark border">
-                  <i className="bi bi-heart-fill text-danger me-1"></i>
-                  {favorites.length} favoritos
-                </span>
-              </div>
-            </div>
-          </div>
-          <Link to="/products/new" className="btn btn-primary">
-            <i className="bi bi-plus-lg me-1"></i>
-            Publicar producto
-          </Link>
-        </div>
+        <ProfileHeader
+          currentUser={currentUser}
+          avatarInitials={avatarInitials}
+          activeProductsCount={activeProducts.length}
+          favoritesCount={favorites.length}
+        />
 
         {/* Pestañas */}
         <ul className="nav nav-tabs mb-4" role="tablist">
           <li className="nav-item" role="presentation">
             <button
               className={`nav-link ${activeTab === "products" ? "active" : ""}`}
-              onClick={() => setActiveTab("products")}
+              onClick={() => switchTab("products")}
               type="button"
               role="tab"
             >
               <i className="bi bi-bag me-2"></i>
-              Mis Productos
+              Mis productos
+            </button>
+          </li>
+          <li className="nav-item" role="presentation">
+            <button
+              className={`nav-link ${activeTab === "favorites" ? "active" : ""}`}
+              onClick={() => switchTab("favorites")}
+              type="button"
+              role="tab"
+            >
+              <i className="bi bi-heart me-2"></i>
+              Favoritos
             </button>
           </li>
           <li className="nav-item" role="presentation">
             <button
               className={`nav-link ${activeTab === "edit" ? "active" : ""}`}
-              onClick={() => setActiveTab("edit")}
+              onClick={() => switchTab("edit")}
               type="button"
               role="tab"
             >
               <i className="bi bi-person-gear me-2"></i>
-              Editar Perfil
+              Editar perfil
             </button>
           </li>
           <li className="nav-item" role="presentation">
             <button
               className={`nav-link ${activeTab === "statistics" ? "active" : ""}`}
-              onClick={() => setActiveTab("statistics")}
+              onClick={() => switchTab("statistics")}
               type="button"
               role="tab"
             >
               <i className="bi bi-graph-up me-2"></i>
               Estadísticas
+            </button>
+          </li>
+          <li className="nav-item" role="presentation">
+            <button
+              className={`nav-link ${activeTab === "settings" ? "active" : ""}`}
+              onClick={() => switchTab("settings")}
+              type="button"
+              role="tab"
+            >
+              <i className="bi bi-gear me-2"></i>
+              Configuración
             </button>
           </li>
         </ul>
@@ -813,7 +719,7 @@ export default function Profile() {
       </div>
         )}
 
-        {/* Pestaña de Editar Perfil */}
+        {/* Pestaña de editar perfil */}
         {activeTab === "edit" && (
           <div className="card border-0 shadow-sm rounded-4">
             <div className="card-body p-4 p-md-5">
@@ -909,7 +815,7 @@ export default function Profile() {
                 </div>
 
                 <div className="mb-4">
-                  <label className="form-label small fw-600">Email</label>
+                  <label className="form-label small fw-600">Correo electrónico</label>
                   <input
                     type="email"
                     name="email"
@@ -964,159 +870,48 @@ export default function Profile() {
         )}
 
         {activeTab === "statistics" && (
-          <div>
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h2 className="h5 fw-bold mb-0">Mis Estadísticas</h2>
-            </div>
-
-            {isLoadingStatistics ? (
-              <div className="card border-0 shadow-sm rounded-4">
-                <div className="card-body p-5 text-center">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Cargando...</span>
-                  </div>
-                  <p className="text-muted mt-3 mb-0">Cargando estadísticas...</p>
-                </div>
-              </div>
-            ) : statisticsError ? (
-              <div className="alert alert-danger">
-                <i className="bi bi-exclamation-triangle me-2"></i>
-                {statisticsError}
-              </div>
-            ) : statistics ? (
-              <div>
-                {/* Estadísticas de pujas */}
-                <div className="card border-0 shadow-sm rounded-4 mb-4">
-                  <div className="card-body p-4">
-                    <h3 className="h6 fw-bold mb-3 d-flex align-items-center">
-                      <i className="bi bi-hammer text-primary me-2"></i>
-                      Actividad en Subastas
-                    </h3>
-                    <div className="row g-3">
-                      <div className="col-md-3 col-6">
-                        <div className="text-center p-3 rounded-3" style={{backgroundColor: '#f8f9fa'}}>
-                          <div className="display-6 fw-bold text-primary">{statistics.totalBids}</div>
-                          <div className="small text-muted mt-2">Pujas Realizadas</div>
-                        </div>
-                      </div>
-                      <div className="col-md-3 col-6">
-                        <div className="text-center p-3 rounded-3" style={{backgroundColor: '#f8f9fa'}}>
-                          <div className="display-6 fw-bold text-success">{statistics.wonAuctions}</div>
-                          <div className="small text-muted mt-2">Subastas Ganadas</div>
-                        </div>
-                      </div>
-                      <div className="col-md-3 col-6">
-                        <div className="text-center p-3 rounded-3" style={{backgroundColor: '#f8f9fa'}}>
-                          <div className="display-6 fw-bold text-info">{statistics.successRate.toFixed(1)}%</div>
-                          <div className="small text-muted mt-2">Tasa de Éxito</div>
-                        </div>
-                      </div>
-                      <div className="col-md-3 col-6">
-                        <div className="text-center p-3 rounded-3" style={{backgroundColor: '#f8f9fa'}}>
-                          <div className="display-6 fw-bold text-warning">{statistics.totalSpent.toFixed(2)}€</div>
-                          <div className="small text-muted mt-2">Total Gastado</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Estadísticas de productos */}
-                <div className="card border-0 shadow-sm rounded-4 mb-4">
-                  <div className="card-body p-4">
-                    <h3 className="h6 fw-bold mb-3 d-flex align-items-center">
-                      <i className="bi bi-bag text-primary me-2"></i>
-                      Mis Productos
-                    </h3>
-                    <div className="row g-3">
-                      <div className="col-md-4 col-6">
-                        <div className="text-center p-3 rounded-3" style={{backgroundColor: '#f8f9fa'}}>
-                          <div className="display-6 fw-bold text-success">{statistics.activeProducts}</div>
-                          <div className="small text-muted mt-2">Productos Activos</div>
-                        </div>
-                      </div>
-                      <div className="col-md-4 col-6">
-                        <div className="text-center p-3 rounded-3" style={{backgroundColor: '#f8f9fa'}}>
-                          <div className="display-6 fw-bold text-secondary">{statistics.closedProducts}</div>
-                          <div className="small text-muted mt-2">Productos Cerrados</div>
-                        </div>
-                      </div>
-                      <div className="col-md-4 col-6">
-                        <div className="text-center p-3 rounded-3" style={{backgroundColor: '#f8f9fa'}}>
-                          <div className="display-6 fw-bold text-primary">{statistics.receivedBids}</div>
-                          <div className="small text-muted mt-2">Pujas Recibidas</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Estadística de favoritos */}
-                <div className="card border-0 shadow-sm rounded-4">
-                  <div className="card-body p-4">
-                    <h3 className="h6 fw-bold mb-3 d-flex align-items-center">
-                      <i className="bi bi-heart text-danger me-2"></i>
-                      Favoritos
-                    </h3>
-                    <div className="row g-3">
-                      <div className="col-md-12">
-                        <div className="text-center p-3 rounded-3" style={{backgroundColor: '#f8f9fa'}}>
-                          <div className="display-6 fw-bold text-danger">{statistics.totalFavorites}</div>
-                          <div className="small text-muted mt-2">Productos en Favoritos</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Resumen de rendimiento */}
-                {statistics.totalBids > 0 && (
-                  <div className="alert alert-info mt-4">
-                    <div className="d-flex align-items-center">
-                      <i className="bi bi-info-circle fs-4 me-3"></i>
-                      <div>
-                        <strong>Resumen de tu actividad:</strong>
-                        <div className="mt-2">
-                          {statistics.wonAuctions > 0 ? (
+          <>
+            <ProfileStatisticsTab
+              statistics={statistics}
+              isLoading={isLoadingStatistics}
+              error={statisticsError}
+            />
+            {statistics && statistics.totalBids > 0 && (
+              <div className="alert alert-info mt-4">
+                <div className="d-flex align-items-center">
+                  <i className="bi bi-info-circle fs-4 me-3"></i>
+                  <div>
+                    <strong>Resumen de tu actividad:</strong>
+                    <div className="mt-2">
+                      {statistics.wonAuctions > 0 ? (
+                        <span>
+                          Has ganado <strong>{statistics.wonAuctions}</strong> de{" "}
+                          <strong>{statistics.totalBids}</strong> pujas realizadas, con una tasa de
+                          éxito del <strong>{statistics.successRate.toFixed(1)}%</strong>.
+                          {statistics.totalSpent > 0 && (
                             <span>
-                              Has ganado <strong>{statistics.wonAuctions}</strong> de <strong>{statistics.totalBids}</strong> pujas realizadas,
-                              con una tasa de éxito del <strong>{statistics.successRate.toFixed(1)}%</strong>.
-                              {statistics.totalSpent > 0 && (
-                                <span> Has gastado un total de <strong>{statistics.totalSpent.toFixed(2)}€</strong> en subastas ganadas.</span>
-                              )}
-                            </span>
-                          ) : (
-                            <span>
-                              Has realizado <strong>{statistics.totalBids}</strong> pujas pero aún no has ganado ninguna subasta.
-                              ¡Sigue intentándolo!
+                              {" "}
+                              Has gastado un total de{" "}
+                              <strong>{statistics.totalSpent.toFixed(2)}€</strong> en subastas
+                              ganadas.
                             </span>
                           )}
-                        </div>
-                      </div>
+                        </span>
+                      ) : (
+                        <span>
+                          Has realizado <strong>{statistics.totalBids}</strong> pujas pero aún no
+                          has ganado ninguna subasta. ¡Sigue intentándolo!
+                        </span>
+                      )}
                     </div>
                   </div>
-                )}
-              </div>
-            ) : (
-              <div className="alert alert-warning">
-                <i className="bi bi-exclamation-triangle me-2"></i>
-                No se pudieron cargar las estadísticas.
+                </div>
               </div>
             )}
-          </div>
+          </>
         )}
 
-        {activeTab === "settings" && (
-          <div className="card border-0 shadow-sm rounded-4">
-            <div className="card-body p-4 p-md-5">
-              <h2 className="h5 fw-bold mb-4">Configuración</h2>
-              <div className="alert alert-info">
-                <i className="bi bi-info-circle me-2"></i>
-                Esta sección está en desarrollo. Próximamente podrás gestionar tus preferencias de notificaciones, privacidad y más.
-              </div>
-            </div>
-          </div>
-        )}
+        {activeTab === "settings" && <ProfileSettingsTab currentUser={currentUser} />}
 
         {activeTab === "favorites" && (
           <div>

@@ -4,6 +4,7 @@ import com.forbids.model.Bid;
 import com.forbids.model.Product;
 import com.forbids.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -30,6 +31,10 @@ public interface BidRepository extends JpaRepository<Bid, Long> {
     @Query("SELECT COUNT(DISTINCT b) FROM Bid b WHERE b.product.owner = :owner")
     long countReceivedBidsByOwner(User owner);
 
-    @Query("SELECT DISTINCT b.product FROM Bid b JOIN FETCH b.product.owner WHERE b.bidder = :bidder ORDER BY b.createdAt DESC")
-    List<Product> findDistinctProductsByBidder(User bidder);
+    @Query("SELECT b FROM Bid b JOIN FETCH b.product p JOIN FETCH p.owner WHERE b.bidder = :bidder ORDER BY b.createdAt DESC")
+    List<Bid> findAllByBidderWithProductOrderByCreatedAtDesc(User bidder);
+
+    @Modifying
+    @Query("DELETE FROM Bid b WHERE b.product.id = :productId")
+    void deleteByProductId(Long productId);
 }

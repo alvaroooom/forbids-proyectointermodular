@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.forbids.dto.FavoriteResponse;
+import com.forbids.exception.BadRequestException;
+import com.forbids.exception.NotFoundException;
 import com.forbids.model.Bid;
 import com.forbids.model.Favorite;
 import com.forbids.model.Product;
@@ -27,7 +29,7 @@ public class FavoriteService {
     private final BidRepository bidRepository;
     private final ProductService productService;
 
-    public FavoriteService(FavoriteRepository favoriteRepository, 
+    public FavoriteService(FavoriteRepository favoriteRepository,
                           UserRepository userRepository,
                           ProductRepository productRepository,
                           BidRepository bidRepository,
@@ -41,37 +43,35 @@ public class FavoriteService {
 
     @Transactional
     public void addFavorite(Long userId, Long productId) {
-        // Verificar que el usuario existe
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+            .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
 
-        // Verificar que el producto existe
         Product product = productRepository.findById(productId)
-            .orElseThrow(() -> new RuntimeException("Producto no encontrado"));
+            .orElseThrow(() -> new NotFoundException("Producto no encontrado"));
 
-        // Verificar que no sea un favorito duplicado
-        if (favoriteRepository.existsByUserIdAndProductId(userId, productId)) {
-            throw new RuntimeException("Este producto ya está en favoritos");
+        if (product.getOwner().getId().equals(userId)) {
+            throw new BadRequestException("No puedes añadir tu propio producto a favoritos");
         }
 
-        // Crear y guardar el favorito
-        Favorite favorite = new Favorite(user, product);
-        favoriteRepository.save(favorite);
+        if (favoriteRepository.existsByUserIdAndProductId(userId, productId)) {
+            throw new BadRequestException("Este producto ya está en favoritos");
+        }
+
+        favoriteRepository.save(new Favorite(user, product));
     }
 
     @Transactional
     public void removeFavorite(Long userId, Long productId) {
         Favorite favorite = favoriteRepository.findByUserIdAndProductId(userId, productId)
-            .orElseThrow(() -> new RuntimeException("Favorito no encontrado"));
+            .orElseThrow(() -> new NotFoundException("Favorito no encontrado"));
 
         favoriteRepository.delete(favorite);
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public List<FavoriteResponse> getUserFavorites(Long userId) {
-        List<Favorite> favorites = favoriteRepository.findAllByUserId(userId);
-        
-        return favorites.stream()
+        return favoriteRepository.findAllByUserId(userId)
+            .stream()
             .map(this::toResponse)
             .collect(Collectors.toList());
     }
@@ -87,23 +87,18 @@ public class FavoriteService {
     }
 
     private FavoriteResponse toResponse(Favorite favorite) {
-        if (favorite == null) {
-            throw new RuntimeException("Favorito nulo");
-        }
-        
         Product product = favorite.getProduct();
         if (product == null) {
-            throw new RuntimeException("Producto no encontrado para favorito");
+            throw new NotFoundException("Producto no encontrado para favorito");
         }
 
         product = productService.ensureAuctionState(product);
-        
+
         User owner = product.getOwner();
         if (owner == null) {
-            throw new RuntimeException("Propietario no encontrado para producto");
+            throw new NotFoundException("Propietario no encontrado para producto");
         }
 
-        // Calcular el precio actual como la puja más alta o el precio inicial
         Optional<Bid> highestBid = bidRepository.findTopByProductOrderByAmountDesc(product);
         BigDecimal currentPrice = highestBid
             .map(Bid::getAmount)

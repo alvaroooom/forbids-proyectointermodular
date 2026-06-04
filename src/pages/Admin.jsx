@@ -2,59 +2,25 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import LiveCountdown from "../components/LiveCountdown";
-import { clearAuthSession, fetchCurrentUser, getAuthSession } from "../utils/auth";
+import AdminUsersPanel from "../components/admin/AdminUsersPanel";
+import { api } from "../utils/api";
+import { useAuth } from "../context/AuthContext";
 import { formatAuctionEndDate, isAuctionClosed, isAuctionUrgent } from "../utils/auctionTime";
 import { getCategoryLabel, getCategoryBadgeClass } from "../utils/categories";
 
 export default function Admin() {
   const navigate = useNavigate();
-  const [currentUser, setCurrentUser] = useState(null);
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const { currentUser } = useAuth();
   const [products, setProducts] = useState([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [adminTab, setAdminTab] = useState("products");
 
   useEffect(() => {
-    let isMounted = true;
-
-    const validateSession = async () => {
-      try {
-        const user = await fetchCurrentUser();
-        
-        // Verificar que el usuario sea administrador
-        if (user.role !== "ADMIN") {
-          if (isMounted) {
-            navigate("/home");
-          }
-          return;
-        }
-
-        if (isMounted) {
-          setCurrentUser(user);
-        }
-      } catch {
-        clearAuthSession();
-        if (isMounted) {
-          navigate("/login");
-        }
-      } finally {
-        if (isMounted) {
-          setIsCheckingSession(false);
-        }
-      }
-    };
-
-    validateSession();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [navigate]);
-
-  useEffect(() => {
-    if (isCheckingSession || !currentUser) {
+    if (!currentUser) {
       return;
     }
 
@@ -62,31 +28,16 @@ export default function Admin() {
 
     const loadProducts = async () => {
       setIsLoadingProducts(true);
+      setLoadError("");
       try {
-        const session = getAuthSession();
-        if (!session?.token) {
-          throw new Error("No active session");
-        }
-
-        const response = await fetch("http://localhost:8080/api/products/admin/all", {
-          headers: {
-            Authorization: `Bearer ${session.token}`,
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch products");
-        }
-
-        const data = await response.json();
+        const data = await api.get("/api/products/admin/all", { auth: true });
         if (isMounted) {
           setProducts(data);
         }
       } catch (error) {
-        console.error("Error loading products:", error);
-        if (isMounted && error.message.includes("session")) {
-          clearAuthSession();
-          navigate("/login");
+        if (isMounted) {
+          setProducts([]);
+          setLoadError(error.message || "No se pudieron cargar los productos");
         }
       } finally {
         if (isMounted) {
@@ -100,11 +51,35 @@ export default function Admin() {
     return () => {
       isMounted = false;
     };
-  }, [isCheckingSession, currentUser, navigate]);
+  }, [currentUser]);
 
-  const handleLogout = () => {
-    clearAuthSession();
-    navigate("/login");
+  const reloadProducts = async () => {
+    const data = await api.get("/api/products/admin/all", { auth: true });
+    setProducts(Array.isArray(data) ? data : []);
+  };
+
+  const handleDeleteProduct = async (productId) => {
+    if (!confirm("¿Eliminar este producto permanentemente?")) {
+      return;
+    }
+    try {
+      await api.delete(`/api/admin/products/${productId}`, { auth: true });
+      await reloadProducts();
+    } catch (error) {
+      alert(error.message || "No se pudo eliminar");
+    }
+  };
+
+  const handleForceClose = async (productId) => {
+    if (!confirm("¿Forzar cierre de esta subasta?")) {
+      return;
+    }
+    try {
+      await api.post(`/api/admin/products/${productId}/force-close`, undefined, { auth: true });
+      await reloadProducts();
+    } catch (error) {
+      alert(error.message || "No se pudo cerrar");
+    }
   };
 
   const filteredProducts = products.filter((product) => {
@@ -123,24 +98,19 @@ export default function Admin() {
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
-  if (isCheckingSession) {
-    return (
-      <div className="d-flex justify-content-center align-items-center vh-100">
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Cargando...</span>
-        </div>
-      </div>
-    );
+  if (!currentUser) {
+    return null;
   }
 
   return (
     <>
-      <Navbar
-        currentUser={currentUser}
-        showSearch={false}
-        onLogout={handleLogout}
-      />
+      <Navbar currentUser={currentUser} showSearch={false} />
       <div className="container py-4">
+        {loadError && (
+          <div className="alert alert-danger" role="alert">
+            {loadError}
+          </div>
+        )}
         <div className="row mb-4">
           <div className="col">
             <h1 className="display-6 fw-bold text-primary">
@@ -148,12 +118,36 @@ export default function Admin() {
               Panel de Administración
             </h1>
             <p className="text-muted">
-              Historial completo de todas las subastas (activas y cerradas)
+              Gestión de subastas y usuarios
             </p>
           </div>
         </div>
 
-        {/* Filtros */}
+        <ul className="nav nav-tabs mb-4">
+          <li className="nav-item">
+            <button
+              type="button"
+              className={`nav-link ${adminTab === "products" ? "active" : ""}`}
+              onClick={() => setAdminTab("products")}
+            >
+              Subastas
+            </button>
+          </li>
+          <li className="nav-item">
+            <button
+              type="button"
+              className={`nav-link ${adminTab === "users" ? "active" : ""}`}
+              onClick={() => setAdminTab("users")}
+            >
+              Usuarios
+            </button>
+          </li>
+        </ul>
+
+        {adminTab === "users" ? (
+          <AdminUsersPanel currentUser={currentUser} />
+        ) : (
+          <>
         <div className="card mb-4 shadow-sm">
           <div className="card-body">
             <div className="row g-3">
@@ -311,9 +305,8 @@ export default function Admin() {
                         {!closed ? (
                           <div className={`text-center p-2 rounded ${urgent ? "bg-danger-subtle" : "bg-info-subtle"}`}>
                             <LiveCountdown
-                              endAt={product.endAt}
-                              urgent={urgent}
-                              onExpire={() => {}}
+                              endDate={product.endAt}
+                              isClosed={closed}
                             />
                           </div>
                         ) : (
@@ -333,12 +326,28 @@ export default function Admin() {
                           </div>
                         )}
 
-                        <button
-                          className="btn btn-outline-primary w-100 mt-3"
-                          onClick={() => navigate(`/products/${product.id}`)}
-                        >
-                          Ver detalles
-                        </button>
+                        <div className="d-grid gap-2 mt-3">
+                          <button
+                            className="btn btn-outline-primary"
+                            onClick={() => navigate(`/products/${product.id}`)}
+                          >
+                            Ver detalles
+                          </button>
+                          {!closed && (
+                            <button
+                              className="btn btn-outline-warning btn-sm"
+                              onClick={() => handleForceClose(product.id)}
+                            >
+                              Forzar cierre
+                            </button>
+                          )}
+                          <button
+                            className="btn btn-outline-danger btn-sm"
+                            onClick={() => handleDeleteProduct(product.id)}
+                          >
+                            Eliminar
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -346,6 +355,8 @@ export default function Admin() {
               );
             })}
           </div>
+        )}
+          </>
         )}
       </div>
     </>

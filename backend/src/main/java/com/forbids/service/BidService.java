@@ -1,6 +1,8 @@
 package com.forbids.service;
 
 import com.forbids.dto.BidResponse;
+import com.forbids.exception.BadRequestException;
+import com.forbids.exception.ForbiddenException;
 import com.forbids.model.Bid;
 import com.forbids.model.Product;
 import com.forbids.model.User;
@@ -21,11 +23,11 @@ public class BidService {
 
     public BidResponse placeBid(Product product, User bidder, BigDecimal amount, String imageUrl) {
         if (Boolean.TRUE.equals(product.getClosed())) {
-            throw new RuntimeException("Auction is closed");
+            throw new BadRequestException("La subasta está cerrada");
         }
 
         if (product.getOwner().getId().equals(bidder.getId())) {
-            throw new RuntimeException("You cannot bid on your own product");
+            throw new ForbiddenException("No puedes pujar en tu propio producto");
         }
 
         BigDecimal currentPrice = bidRepository.findTopByProductOrderByAmountDesc(product)
@@ -33,7 +35,7 @@ public class BidService {
                 .orElse(product.getStartingPrice());
 
         if (amount.compareTo(currentPrice) <= 0) {
-            throw new RuntimeException("Bid must be higher than current price");
+            throw new BadRequestException("La puja debe ser superior al precio actual");
         }
 
         String bidImageUrl = product.getImageUrl();

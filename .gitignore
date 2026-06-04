@@ -1,5 +1,10 @@
 node_modules/
 dist/
+backend/target/
+uploads/
+.github/java-upgrade/
+.github/modernize/
+backend/.github/
 .DS_Store
 *.env
 *.env.local

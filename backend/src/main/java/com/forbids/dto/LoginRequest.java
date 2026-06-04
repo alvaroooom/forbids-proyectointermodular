@@ -3,11 +3,11 @@ package com.forbids.dto;
 import jakarta.validation.constraints.NotBlank;
 
 public class LoginRequest {
-    
-    @NotBlank
+
+    @NotBlank(message = "El usuario o correo es obligatorio")
     private String username;
-    
-    @NotBlank
+
+    @NotBlank(message = "La contraseña es obligatoria")
     private String password;
 
     public LoginRequest() {

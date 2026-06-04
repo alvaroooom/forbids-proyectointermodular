@@ -1,10 +1,14 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, Navigate } from "react-router-dom";
 import "../styles/auth.css";
+import { api } from "../utils/api";
 import { saveAuthSession } from "../utils/auth";
+import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { refreshUser, currentUser, isLoading } = useAuth();
   const [credentials, setCredentials] = useState({
     username: "",
     password: "",
@@ -26,31 +30,30 @@ export default function Login() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("http://localhost:8080/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username: credentials.username.trim(),
-          password: credentials.password,
-        }),
+      const data = await api.post("/api/auth/login", {
+        username: credentials.username.trim(),
+        password: credentials.password,
       });
 
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data.message || "No se pudo iniciar sesión");
-      }
-
       saveAuthSession(data);
-      navigate("/home");
+      await refreshUser();
+      const redirectTo = location.state?.from?.pathname || "/home";
+      const redirectHash = location.state?.from?.hash || "";
+      navigate(`${redirectTo}${redirectHash}`, { replace: true });
     } catch (error) {
-      setErrorMessage(error.message || "Error inesperado al iniciar sesión");
+      if (error instanceof TypeError) {
+        setErrorMessage("No se pudo conectar con el servidor. Comprueba que el backend esté en marcha (puerto 8080).");
+      } else {
+        setErrorMessage(error.message || "Error inesperado al iniciar sesión");
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  if (!isLoading && currentUser) {
+    return <Navigate to="/home" replace />;
+  }
 
   return (
     <div className="main-content d-flex flex-column">
@@ -119,17 +122,8 @@ export default function Login() {
                   </div>
                 </div>
 
-                <div className="d-flex justify-content-between align-items-center mb-4 small">
-                  <a
-                    href="#"
-                    className="text-decoration-none text-primary fw-600"
-                  >
-                    ¿Has olvidado tu contraseña?
-                  </a>
-                </div>
-
                 {errorMessage && (
-                  <div className="alert alert-danger small py-2" role="alert">
+                  <div className="alert alert-danger small py-2 mb-4" role="alert">
                     {errorMessage}
                   </div>
                 )}

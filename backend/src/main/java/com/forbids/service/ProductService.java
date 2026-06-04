@@ -2,6 +2,9 @@ package com.forbids.service;
 
 import com.forbids.dto.CreateProductRequest;
 import com.forbids.dto.ProductResponse;
+import com.forbids.exception.BadRequestException;
+import com.forbids.exception.ForbiddenException;
+import com.forbids.exception.NotFoundException;
 import com.forbids.model.Bid;
 import com.forbids.model.Category;
 import com.forbids.model.Product;
@@ -10,6 +13,8 @@ import com.forbids.repository.BidRepository;
 import com.forbids.repository.CommentRepository;
 import com.forbids.repository.FavoriteRepository;
 import com.forbids.repository.ProductRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -24,6 +29,7 @@ import java.util.concurrent.ThreadLocalRandom;
 @Service
 public class ProductService {
 
+    private static final Logger log = LoggerFactory.getLogger(ProductService.class);
     private static final int DEFAULT_DURATION_MINUTES = 60;
 
     private final ProductRepository productRepository;
@@ -71,12 +77,27 @@ public class ProductService {
     }
 
     public List<ProductResponse> getAllProducts() {
+        return getAllProducts("open");
+    }
+
+    public List<ProductResponse> getAllProducts(String status) {
+        String normalizedStatus = status == null ? "open" : status.trim().toLowerCase();
+
         return productRepository.findAllByOrderByCreatedAtDesc()
                 .stream()
-            .map(this::ensureAuctionState)
-            .filter(product -> !Boolean.TRUE.equals(product.getClosed())) // Solo productos activos
+                .map(this::ensureAuctionState)
+                .filter(product -> matchesPublicStatus(product, normalizedStatus))
                 .map(this::toResponse)
                 .toList();
+    }
+
+    private boolean matchesPublicStatus(Product product, String status) {
+        boolean closed = Boolean.TRUE.equals(product.getClosed());
+        return switch (status) {
+            case "closed" -> closed;
+            case "all" -> true;
+            default -> !closed;
+        };
     }
 
     public List<ProductResponse> getAllProductsIncludingClosed() {
@@ -112,7 +133,7 @@ public class ProductService {
 
     public Product getProductById(Long productId) {
         Product product = productRepository.findById(productId)
-            .orElseThrow(() -> new RuntimeException("Product not found"));
+            .orElseThrow(() -> new NotFoundException("Producto no encontrado"));
 
         return ensureAuctionState(product);
     }
@@ -125,11 +146,22 @@ public class ProductService {
         Product product = getProductById(productId);
 
         if (!product.getOwner().getId().equals(requester.getId())) {
-            throw new RuntimeException("Only owner can close auction");
+            throw new ForbiddenException("Solo el propietario puede cerrar la subasta");
         }
 
         if (Boolean.TRUE.equals(product.getClosed())) {
-            throw new RuntimeException("Auction already closed");
+            throw new BadRequestException("La subasta ya está cerrada");
+        }
+
+        Product savedProduct = closeAuctionInternal(product);
+        return toResponse(savedProduct);
+    }
+
+    public ProductResponse forceCloseAuction(Long productId) {
+        Product product = getProductById(productId);
+
+        if (Boolean.TRUE.equals(product.getClosed())) {
+            throw new BadRequestException("La subasta ya está cerrada");
         }
 
         Product savedProduct = closeAuctionInternal(product);
@@ -178,7 +210,7 @@ public class ProductService {
         }
 
         if (!expiredProducts.isEmpty()) {
-            System.out.println("Closed " + expiredProducts.size() + " expired auction(s)");
+            log.info("Closed {} expired auction(s)", expiredProducts.size());
         }
     }
 

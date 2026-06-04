@@ -5,7 +5,8 @@ body {
 }
 
 body {
-  background-color: #f8fbff;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   display: flex;
   flex-direction: column;

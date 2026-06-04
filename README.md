@@ -1,76 +1,119 @@
-# ForBids - Plataforma de Compraventa y Subastas de Segunda Mano
+# ForBids
 
-Proyecto intermodular de Desarrollo de Aplicaciones Web: aplicación web de compraventa de segunda mano que combina publicación de productos, interacción social (likes y comentarios) y subastas.
+Proyecto intermodular de **2º DAW** — IES Camas.  
+**Autor:** Álvaro Muñoz Fernández (`munoz.fernandez.alvaro@iescamas.es`)
 
-## 🛠 Stack Tecnológico
+Marketplace de segunda mano con subastas en tiempo real, chat por producto, favoritos y panel de administración.
 
-### Frontend
-- **React 18** - Librería de interfaz de usuario
-- **Vite** - Bundler y servidor de desarrollo ultrarrápido
-- **React Router v6** - Navegación entre páginas
-- **Bootstrap 5** - Framework CSS para diseño responsive
-- **Prettier** - Formateador de código
+## Tecnologías
 
-### Backend
-- **Spring Boot** - Framework Java
-- **JPA/Hibernate** - ORM para base de datos
-- **MySQL** - Base de datos
+- Frontend: React + Vite + Bootstrap
+- Backend: Spring Boot + MySQL + JWT
+- Tiempo real: WebSocket (pujas y chat)
 
-## 📋 Requisitos Previos
+## Cómo arrancar
 
-- Node.js >= 16.x
-- npm >= 8.x
-
-## 🚀 Instalación y Configuración
-
-### 1. Instalar dependencias
 ```bash
-npm install
-```
+# 1. Instalar dependencias del frontend
+npm install --legacy-peer-deps
 
-### 2. Iniciar servidor de desarrollo
-```bash
+# 2. Backend (requiere MySQL con la BD forbids_bd)
+cd backend
+mvn spring-boot:run
+
+# 3. Frontend (otra terminal, desde la raíz)
 npm run dev
 ```
 
-La aplicación se abrirá automáticamente en `http://localhost:5173/`
+- Frontend: http://localhost:5173  
+- Backend: http://localhost:8080  
 
-### 3. Compilar para producción
+MySQL por defecto: `root` / `root`, base de datos `forbids_bd`.
+
+### Instalar la base de datos desde cero
+
+Si no tienes la BD creada, importa el volcado completo:
+
 ```bash
-npm run build
+mysql -u root -p < forbids.sql
 ```
 
-### 4. Ver vista previa de producción
-```bash
-npm run preview
-```
+Esto crea `forbids_bd` con todas las tablas y los datos de demo.
 
-### 5. Formatear código
-```bash
-npm run format
-```
+## Usuarios de demo
 
-## 🎨 Características Actuales
+| Usuario | Contraseña | Rol |
+|---------|------------|-----|
+| `admin` | `admin123` | Administrador |
+| `alvaro` | `demo123` | Usuario (vendedor demo) |
+| `lucia` | `demo123` | Usuario |
 
-✅ Landing page con hero section
-✅ Página de inicio (home) con navbar
-✅ Login y Registro con validación
-✅ Perfil de usuario
-✅ Páginas de políticas y términos
-✅ Diseño responsive con Bootstrap 5
-✅ Footer consistente en todas las páginas
-✅ Routing entre páginas sin recargas (SPA)
-✅ Código formateado y limpio
+Para resetear los datos de demo: ejecutar `backend/scripts/demo_data.sql` en MySQL.
 
-## 🔄 Próximas Características
+## Qué incluye la app
 
-🔲 Conexión con backend Spring Boot
-🔲 Autenticación JWT
-🔲 Catálogo de productos
-🔲 Sistema de subastas
-🔲 Likes y comentarios
-🔲 Chat en tiempo real
-🔲 Dashboard de vendedor
+- Registro e inicio de sesión
+- Catálogo con búsqueda, filtros y paginación
+- Subastas con pujas en vivo
+- Chat y comentarios por producto
+- Perfil, favoritos y mis pujas
+- Panel `/admin` (solo administradores)
 
-**Estado del Proyecto:** 🚧 En desarrollo
-**Última actualización:** Marzo 2026
+## Repositorio
+
+https://github.com/alvaroooom/forbids-proyectointermodular
+
+## Despliegue (Vercel + Railway)
+
+Recomendado para cumplir el requisito de despliegue. En la defensa puedes usar **local**; online enseñas la URL de Vercel.
+
+| Parte | Plataforma | Gratis |
+|-------|------------|--------|
+| Frontend React | [Vercel](https://vercel.com) | Sí |
+| Backend Spring Boot | [Railway](https://railway.app) | Créditos mensuales |
+| MySQL | Railway (add-on) | Incluido en el servicio |
+
+### 1. Railway — MySQL + backend
+
+1. Cuenta en Railway → **New Project** → **Deploy from GitHub** (este repo).
+2. **Add service → MySQL**. Espera a que arranque.
+3. **Add service → GitHub** otra vez, carpeta raíz: **`backend`** (Root Directory = `backend`).
+4. En el servicio MySQL → **Connect** → copia variables (`MYSQLHOST`, `MYSQLPORT`, etc.).
+5. Importa el esquema y datos:
+   - Railway MySQL → pestaña **Data** / consola, o desde tu PC:
+   ```bash
+   mysql -h HOST -P PORT -u root -p railway < forbids.sql
+   ```
+6. Variables del servicio **backend** (Settings → Variables):
+
+   | Variable | Valor |
+   |----------|--------|
+   | `SPRING_PROFILES_ACTIVE` | `prod` |
+   | `SPRING_DATASOURCE_URL` | `jdbc:mysql://${{MySQL.MYSQLHOST}}:${{MySQL.MYSQLPORT}}/${{MySQL.MYSQLDATABASE}}?useSSL=true&serverTimezone=UTC` |
+   | `SPRING_DATASOURCE_USERNAME` | `${{MySQL.MYSQLUSER}}` |
+   | `SPRING_DATASOURCE_PASSWORD` | `${{MySQL.MYSQLPASSWORD}}` |
+   | `APP_JWT_SECRET` | Clave larga aleatoria (32+ caracteres) |
+   | `APP_CORS_ALLOWED_ORIGINS` | `https://TU-PROYECTO.vercel.app` (la pondrás tras Vercel) |
+
+7. **Generate domain** en Railway (ej. `forbids-api-production.up.railway.app`).
+8. Comprueba: `https://TU-URL-RAILWAY/actuator/health` → `{"status":"UP"}`.
+
+### 2. Vercel — frontend
+
+1. [vercel.com](https://vercel.com) → **Import** del mismo repo GitHub.
+2. Framework: **Vite** (detectado automático).
+3. **Environment Variable:**
+   - `VITE_API_BASE_URL` = `https://TU-URL-RAILWAY` (sin barra final).
+4. Deploy. Copia la URL (ej. `https://forbids.vercel.app`).
+5. Vuelve a Railway y actualiza `APP_CORS_ALLOWED_ORIGINS` con esa URL. Redeploy del backend.
+
+### 3. Probar online
+
+- Abre la URL de Vercel → registro/login → catálogo → puja.
+- Si el backend estuvo parado, la primera petición puede tardar ~20–30 s (plan free).
+
+### Notas
+
+- Las **imágenes subidas al servidor** en Railway pueden perderse al reiniciar; en demo usa URLs externas.
+- **Presentación en el instituto:** sigue usando `npm run dev` + `mvn spring-boot:run` en local (más estable para WebSocket en vivo).
+- Archivos de despliegue: `vercel.json`, `backend/Dockerfile`, `backend/railway.toml`.

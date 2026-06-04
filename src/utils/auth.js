@@ -1,5 +1,16 @@
-const API_BASE_URL = "http://localhost:8080";
+import { apiUrl } from "./api";
+
 const AUTH_STORAGE_KEY = "forbidsAuth";
+const sessionListeners = new Set();
+
+export function onSessionExpired(listener) {
+  sessionListeners.add(listener);
+  return () => sessionListeners.delete(listener);
+}
+
+export function notifySessionExpired() {
+  sessionListeners.forEach((listener) => listener());
+}
 
 export function saveAuthSession(authResponse) {
   if (!authResponse?.token) {
@@ -42,19 +53,22 @@ export function getAuthSession() {
   }
 }
 
-export function clearAuthSession() {
+export function clearAuthSession({ notify = true } = {}) {
   localStorage.removeItem(AUTH_STORAGE_KEY);
   localStorage.removeItem("forbidsUser");
+  if (notify) {
+    notifySessionExpired();
+  }
 }
 
 export async function fetchCurrentUser() {
   const session = getAuthSession();
 
   if (!session?.token) {
-    throw new Error("No active session");
+    throw new Error("No hay sesión activa");
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+  const response = await fetch(apiUrl("/api/auth/me"), {
     method: "GET",
     headers: {
       Authorization: `Bearer ${session.token}`,
@@ -64,7 +78,7 @@ export async function fetchCurrentUser() {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(data.message || "Session expired");
+    throw new Error(data.message || "La sesión ha caducado");
   }
 
   const nextSession = {

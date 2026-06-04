@@ -3,6 +3,9 @@ package com.forbids.service;
 import com.forbids.dto.AuthResponse;
 import com.forbids.dto.LoginRequest;
 import com.forbids.dto.RegisterRequest;
+import com.forbids.exception.BadRequestException;
+import com.forbids.exception.ForbiddenException;
+import com.forbids.exception.UnauthorizedException;
 import com.forbids.model.User;
 import com.forbids.repository.UserRepository;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -15,19 +18,19 @@ public class AuthService {
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
-    public AuthService(UserRepository userRepository, JwtService jwtService) {
+    public AuthService(UserRepository userRepository, BCryptPasswordEncoder passwordEncoder, JwtService jwtService) {
         this.userRepository = userRepository;
-        this.passwordEncoder = new BCryptPasswordEncoder();
+        this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
 
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
-            throw new RuntimeException("Username already exists");
+            throw new BadRequestException("El nombre de usuario ya existe");
         }
         
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already exists");
+            throw new BadRequestException("El correo electrónico ya existe");
         }
 
         User user = new User(
@@ -46,7 +49,7 @@ public class AuthService {
             user.getProfileImageUrl(),
             token,
             user.getRole(),
-            "User registered successfully"
+            "Usuario registrado correctamente"
         );
     }
 
@@ -55,10 +58,14 @@ public class AuthService {
 
         User user = userRepository.findByUsername(identifier)
             .or(() -> userRepository.findByEmail(identifier))
-            .orElseThrow(() -> new RuntimeException("Invalid credentials"));
+            .orElseThrow(() -> new UnauthorizedException("Credenciales inválidas"));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new RuntimeException("Invalid credentials");
+            throw new UnauthorizedException("Credenciales inválidas");
+        }
+
+        if (user.isBanned()) {
+            throw new ForbiddenException("Cuenta suspendida");
         }
 
         String token = jwtService.generateToken(user);
@@ -70,47 +77,22 @@ public class AuthService {
             user.getProfileImageUrl(),
             token,
             user.getRole(),
-            "Login successful"
-        );
-    }
-
-    public AuthResponse validateTokenAndGetUser(String token) {
-        if (token == null || token.isBlank()) {
-            throw new RuntimeException("Missing token");
-        }
-
-        if (!jwtService.isTokenValid(token)) {
-            throw new RuntimeException("Invalid or expired token");
-        }
-
-        String username = jwtService.extractUsername(token);
-
-        User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new RuntimeException("User not found"));
-
-        return new AuthResponse(
-            user.getId(),
-            user.getUsername(),
-            user.getEmail(),
-            user.getProfileImageUrl(),
-            token,
-            user.getRole(),
-            "Token valid"
+            "Inicio de sesión correcto"
         );
     }
 
     public AuthResponse updateProfile(String token, com.forbids.dto.UpdateProfileRequest request) {
         if (token == null || token.isBlank()) {
-            throw new RuntimeException("Missing token");
+            throw new UnauthorizedException("Token ausente");
         }
 
         if (!jwtService.isTokenValid(token)) {
-            throw new RuntimeException("Invalid or expired token");
+            throw new UnauthorizedException("Token inválido o caducado");
         }
 
         String username = jwtService.extractUsername(token);
         User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> new UnauthorizedException("Usuario no encontrado"));
 
         boolean updated = false;
 
@@ -118,7 +100,7 @@ public class AuthService {
         if (request.getUsername() != null && !request.getUsername().isBlank() 
             && !request.getUsername().equals(user.getUsername())) {
             if (userRepository.existsByUsername(request.getUsername())) {
-                throw new RuntimeException("Username already exists");
+                throw new BadRequestException("El nombre de usuario ya existe");
             }
             user.setUsername(request.getUsername());
             updated = true;
@@ -128,7 +110,7 @@ public class AuthService {
         if (request.getEmail() != null && !request.getEmail().isBlank()
             && !request.getEmail().equals(user.getEmail())) {
             if (userRepository.existsByEmail(request.getEmail())) {
-                throw new RuntimeException("Email already exists");
+                throw new BadRequestException("El correo electrónico ya existe");
             }
             user.setEmail(request.getEmail());
             updated = true;
@@ -137,10 +119,10 @@ public class AuthService {
         // Actualizar contraseña
         if (request.getNewPassword() != null && !request.getNewPassword().isBlank()) {
             if (request.getCurrentPassword() == null || request.getCurrentPassword().isBlank()) {
-                throw new RuntimeException("Current password is required to change password");
+                throw new BadRequestException("Debes indicar la contraseña actual para cambiarla");
             }
             if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
-                throw new RuntimeException("Current password is incorrect");
+                throw new BadRequestException("La contraseña actual es incorrecta");
             }
             user.setPassword(passwordEncoder.encode(request.getNewPassword()));
             updated = true;
@@ -168,7 +150,19 @@ public class AuthService {
             user.getProfileImageUrl(),
             newToken,
             user.getRole(),
-            "Profile updated successfully"
+            "Perfil actualizado correctamente"
+        );
+    }
+
+    public AuthResponse toAuthResponse(User user, String token, String message) {
+        return new AuthResponse(
+            user.getId(),
+            user.getUsername(),
+            user.getEmail(),
+            user.getProfileImageUrl(),
+            token,
+            user.getRole(),
+            message
         );
     }
 }

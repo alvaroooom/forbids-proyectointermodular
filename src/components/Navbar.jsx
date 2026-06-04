@@ -1,21 +1,19 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
-import { clearAuthSession } from "../utils/auth";
+import ThemeToggle from "./ThemeToggle";
+import { useAuth } from "../context/AuthContext";
 
 export default function Navbar({
   currentUser,
   showSearch = false,
   searchQuery = "",
   onSearchChange = null,
-  onLogout = null,
 }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useAuth();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [isNavOpen, setIsNavOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(() => {
-    return localStorage.getItem("theme") === "dark";
-  });
   const dropdownRef = useRef(null);
 
   const avatarInitials = currentUser?.username
@@ -24,13 +22,7 @@ export default function Navbar({
 
   const handleLogout = (event) => {
     event.preventDefault();
-
-    if (typeof onLogout === "function") {
-      onLogout();
-      return;
-    }
-
-    clearAuthSession();
+    logout();
     navigate("/login");
   };
 
@@ -42,26 +34,6 @@ export default function Navbar({
   const toggleProfileMenu = () => {
     setShowProfileMenu((prev) => !prev);
   };
-
-  const toggleDarkMode = () => {
-    const newMode = !darkMode;
-    setDarkMode(newMode);
-    if (newMode) {
-      document.documentElement.setAttribute("data-theme", "dark");
-      localStorage.setItem("theme", "dark");
-    } else {
-      document.documentElement.removeAttribute("data-theme");
-      localStorage.setItem("theme", "light");
-    }
-  };
-
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.setAttribute("data-theme", "dark");
-    } else {
-      document.documentElement.removeAttribute("data-theme");
-    }
-  }, []);
 
   useEffect(() => {
     closeMenus();
@@ -112,14 +84,7 @@ export default function Navbar({
         </Link>
 
         <div className="d-flex align-items-center gap-2 ms-auto d-lg-none">
-          <button
-            type="button"
-            onClick={toggleDarkMode}
-            className="btn btn-sm btn-outline-secondary border-0"
-            title={darkMode ? "Modo claro" : "Modo oscuro"}
-          >
-            <i className={`bi ${darkMode ? "bi-sun-fill" : "bi-moon-fill"}`}></i>
-          </button>
+          <ThemeToggle />
           <button
             className="navbar-toggler"
             type="button"
@@ -163,169 +128,164 @@ export default function Navbar({
           )}
 
           <div className="navbar-actions ms-lg-auto d-flex align-items-center gap-3 mt-3 mt-lg-0 flex-wrap justify-content-lg-end">
-            <button
-              type="button"
-              onClick={toggleDarkMode}
-              className="btn btn-sm btn-outline-secondary border-0 d-none d-lg-inline-flex"
-              title={darkMode ? "Modo claro" : "Modo oscuro"}
-            >
-              <i className={`bi ${darkMode ? "bi-sun-fill" : "bi-moon-fill"}`}></i>
-            </button>
+            <ThemeToggle className="d-none d-lg-inline-flex" />
 
-            <Link to="/products/new" className="btn btn-sm btn-primary" onClick={closeMenus}>
-              Publicar
-            </Link>
+            {currentUser ? (
+              <>
+                <Link to="/products/new" className="btn btn-sm btn-primary" onClick={closeMenus}>
+                  Publicar
+                </Link>
 
-            <Link
-              to="/profile?tab=favorites"
-              className="fs-5 text-decoration-none"
-              style={{ color: "var(--text-primary)" }}
-              title="Favoritos"
-              onClick={closeMenus}
-            >
-              <i className="bi bi-heart"></i>
-            </Link>
-
-            <Link
-              to="/profile?tab=settings"
-              className="fs-5 position-relative text-decoration-none"
-              style={{ color: "var(--text-primary)" }}
-              title="Configuración"
-              onClick={closeMenus}
-            >
-              <i className="bi bi-bell"></i>
-            </Link>
-
-            <Link
-              to="/my-bids"
-              className="fs-5 text-decoration-none"
-              style={{ color: "var(--text-primary)" }}
-              title="Mis pujas"
-              onClick={closeMenus}
-            >
-              <i className="bi bi-chat-dots"></i>
-            </Link>
-
-            {/* Dropdown del perfil */}
-            <div className="profile-dropdown position-relative" ref={dropdownRef}>
-              <button
-                className="btn p-0 border-0 bg-transparent"
-                onClick={toggleProfileMenu}
-                type="button"
-                aria-expanded={showProfileMenu}
-                aria-haspopup="true"
-                aria-label="Abrir menú de perfil"
-              >
-                {currentUser?.profileImageUrl ? (
-                  <img
-                    src={currentUser.profileImageUrl}
-                    alt={currentUser.username}
-                    className="rounded-circle"
-                    style={{ width: "40px", height: "40px", objectFit: "cover" }}
-                    onError={(e) => {
-                      e.target.style.display = "none";
-                      e.target.nextSibling.style.display = "flex";
-                    }}
-                  />
-                ) : null}
-                <div
-                  className="avatar-nav"
-                  style={{ display: currentUser?.profileImageUrl ? "none" : "flex" }}
+                <Link
+                  to="/profile?tab=favorites"
+                  className="fs-5 text-decoration-none"
+                  style={{ color: "var(--text-primary)" }}
+                  title="Favoritos"
+                  onClick={closeMenus}
                 >
-                  {avatarInitials}
-                </div>
-              </button>
+                  <i className="bi bi-heart"></i>
+                </Link>
 
-              {showProfileMenu && (
-                <div
-                  className="dropdown-menu dropdown-menu-end show position-absolute mt-2 shadow-lg"
-                  style={{
-                    right: 0,
-                    minWidth: "250px",
-                    backgroundColor: "var(--card-bg)",
-                    color: "var(--text-primary)",
-                    border: "1px solid var(--border-color)",
-                  }}
+                <Link
+                  to="/my-bids"
+                  className="fs-5 text-decoration-none"
+                  style={{ color: "var(--text-primary)" }}
+                  title="Mis pujas"
+                  onClick={closeMenus}
                 >
-                  <div className="px-3 py-2 border-bottom">
-                    <div className="fw-bold">{currentUser?.username}</div>
-                    <div className="small text-muted">{currentUser?.email}</div>
-                  </div>
+                  <i className="bi bi-hammer"></i>
+                </Link>
 
-                  <Link
-                    to="/profile?tab=products"
-                    className="dropdown-item py-2"
-                    onClick={closeMenus}
+                <div className="profile-dropdown position-relative" ref={dropdownRef}>
+                  <button
+                    className="btn p-0 border-0 bg-transparent"
+                    onClick={toggleProfileMenu}
+                    type="button"
+                    aria-expanded={showProfileMenu}
+                    aria-haspopup="true"
+                    aria-label="Abrir menú de perfil"
                   >
-                    <i className="bi bi-bag me-2"></i>
-                    Mis Productos
-                  </Link>
+                    {currentUser.profileImageUrl ? (
+                      <img
+                        src={currentUser.profileImageUrl}
+                        alt={currentUser.username}
+                        className="rounded-circle"
+                        style={{ width: "40px", height: "40px", objectFit: "cover" }}
+                        onError={(e) => {
+                          e.target.style.display = "none";
+                          e.target.nextSibling.style.display = "flex";
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className="avatar-nav"
+                      style={{ display: currentUser.profileImageUrl ? "none" : "flex" }}
+                    >
+                      {avatarInitials}
+                    </div>
+                  </button>
 
-                  <Link
-                    to="/my-bids"
-                    className="dropdown-item py-2"
-                    onClick={closeMenus}
-                  >
-                    <i className="bi bi-hammer me-2"></i>
-                    Mis Pujas
-                  </Link>
+                  {showProfileMenu && (
+                    <div
+                      className="dropdown-menu dropdown-menu-end show position-absolute mt-2 shadow-lg"
+                      style={{
+                        right: 0,
+                        minWidth: "250px",
+                        backgroundColor: "var(--card-bg)",
+                        color: "var(--text-primary)",
+                        border: "1px solid var(--border-color)",
+                      }}
+                    >
+                      <div className="px-3 py-2 border-bottom">
+                        <div className="fw-bold">{currentUser.username}</div>
+                        <div className="small text-muted">{currentUser.email}</div>
+                      </div>
 
-                  <div className="dropdown-divider"></div>
-
-                  <div className="dropdown-header small text-uppercase fw-bold">
-                    Ver más
-                  </div>
-
-                  {currentUser?.role === "ADMIN" && (
-                    <>
                       <Link
-                        to="/admin"
+                        to="/profile?tab=products"
                         className="dropdown-item py-2"
                         onClick={closeMenus}
                       >
-                        <i className="bi bi-shield-lock me-2"></i>
-                        Panel Admin
+                        <i className="bi bi-bag me-2"></i>
+                        Mis productos
                       </Link>
+
+                      <Link
+                        to="/my-bids"
+                        className="dropdown-item py-2"
+                        onClick={closeMenus}
+                      >
+                        <i className="bi bi-hammer me-2"></i>
+                        Mis Pujas
+                      </Link>
+
                       <div className="dropdown-divider"></div>
-                    </>
+
+                      <div className="dropdown-header small text-uppercase fw-bold">
+                        Ver más
+                      </div>
+
+                      {currentUser.role === "ADMIN" && (
+                        <>
+                          <Link
+                            to="/admin"
+                            className="dropdown-item py-2"
+                            onClick={closeMenus}
+                          >
+                            <i className="bi bi-shield-lock me-2"></i>
+                            Panel de administración
+                          </Link>
+                          <div className="dropdown-divider"></div>
+                        </>
+                      )}
+
+                      <Link
+                        to="/profile?tab=edit"
+                        className="dropdown-item py-2"
+                        onClick={closeMenus}
+                      >
+                        <i className="bi bi-person-gear me-2"></i>
+                        Editar perfil
+                      </Link>
+
+                      <Link
+                        to="/profile?tab=settings"
+                        className="dropdown-item py-2"
+                        onClick={closeMenus}
+                      >
+                        <i className="bi bi-gear me-2"></i>
+                        Configuración
+                      </Link>
+
+                      <Link
+                        to="/profile?tab=favorites"
+                        className="dropdown-item py-2"
+                        onClick={closeMenus}
+                      >
+                        <i className="bi bi-heart me-2"></i>
+                        Favoritos
+                      </Link>
+
+                      <div className="dropdown-divider"></div>
+
+                      <button className="dropdown-item py-2 text-danger" onClick={handleLogout}>
+                        <i className="bi bi-box-arrow-right me-2"></i>
+                        Cerrar sesión
+                      </button>
+                    </div>
                   )}
-
-                  <Link
-                    to="/profile?tab=edit"
-                    className="dropdown-item py-2"
-                    onClick={closeMenus}
-                  >
-                    <i className="bi bi-person-gear me-2"></i>
-                    Editar Perfil
-                  </Link>
-
-                  <Link
-                    to="/profile?tab=settings"
-                    className="dropdown-item py-2"
-                    onClick={closeMenus}
-                  >
-                    <i className="bi bi-gear me-2"></i>
-                    Configuración
-                  </Link>
-
-                  <Link
-                    to="/profile?tab=favorites"
-                    className="dropdown-item py-2"
-                    onClick={closeMenus}
-                  >
-                    <i className="bi bi-heart me-2"></i>
-                    Favoritos
-                  </Link>
-
-                  <div className="dropdown-divider"></div>
-
-                  <button className="dropdown-item py-2 text-danger" onClick={handleLogout}>
-                    <i className="bi bi-box-arrow-right me-2"></i>
-                    Cerrar sesión
-                  </button>
                 </div>
-              )}
-            </div>
+              </>
+            ) : (
+              <>
+                <Link to="/login" className="btn btn-sm btn-outline-primary" onClick={closeMenus}>
+                  Iniciar sesión
+                </Link>
+                <Link to="/register" className="btn btn-sm btn-primary" onClick={closeMenus}>
+                  Registrarse
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>

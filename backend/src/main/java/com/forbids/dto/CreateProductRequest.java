@@ -11,25 +11,25 @@ import java.math.BigDecimal;
 
 public class CreateProductRequest {
 
-    @NotBlank
-    @Size(min = 3, max = 120)
+    @NotBlank(message = "El título es obligatorio")
+    @Size(min = 3, max = 120, message = "El título debe tener entre 3 y 120 caracteres")
     private String title;
 
-    @NotBlank
-    @Size(min = 10, max = 2000)
+    @NotBlank(message = "La descripción es obligatoria")
+    @Size(min = 10, max = 2000, message = "La descripción debe tener entre 10 y 2000 caracteres")
     private String description;
 
-    @NotNull
-    @DecimalMin(value = "0.01")
+    @NotNull(message = "El precio inicial es obligatorio")
+    @DecimalMin(value = "0.01", message = "El precio inicial debe ser al menos 0,01")
     private BigDecimal startingPrice;
 
-    @Size(max = 500)
+    @Size(max = 500, message = "La URL de imagen no puede superar 500 caracteres")
     private String imageUrl;
 
     private String category;
 
-    @Min(0)
-    @Max(10080)
+    @Min(value = 0, message = "La duración mínima es 0 minutos")
+    @Max(value = 10080, message = "La duración máxima es 10080 minutos")
     private Integer durationMinutes;
 
     public CreateProductRequest() {

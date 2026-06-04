@@ -130,3 +130,27 @@ body {
 [data-theme="dark"] .border {
   border-color: var(--border-color) !important;
 }
+
+@keyframes bidFlashPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(13, 110, 253, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(13, 110, 253, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(13, 110, 253, 0);
+  }
+}
+
+.bid-flash {
+  animation: bidFlashPulse 1.2s ease-out 2;
+  border: 1px solid rgba(13, 110, 253, 0.35) !important;
+}
+
+.bid-flash-text {
+  animation: bidFlashPulse 1.2s ease-out 2;
+  display: inline-block;
+  border-radius: 0.375rem;
+  padding: 0 0.25rem;
+}

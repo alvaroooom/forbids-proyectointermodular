@@ -1,7 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../styles/home.css";
-import { clearAuthSession, fetchCurrentUser, getAuthSession } from "../utils/auth";
+import { api } from "../utils/api";
+import { getAuthSession } from "../utils/auth";
+import { useAuth } from "../context/AuthContext";
+import { useProductRealtime } from "../hooks/useProductRealtime";
 import { formatAuctionEndDate, isAuctionClosed, isAuctionUrgent } from "../utils/auctionTime";
 import { getCategoryLabel, getCategoryBadgeClass } from "../utils/categories";
 import Navbar from "../components/Navbar";
@@ -33,8 +36,7 @@ export default function Home() {
   };
 
   const navigate = useNavigate();
-  const [currentUser, setCurrentUser] = useState(null);
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const { currentUser } = useAuth();
   const [products, setProducts] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -45,60 +47,24 @@ export default function Home() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(getStoredItemsPerPage);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [bidAmounts, setBidAmounts] = useState({});
   const [bidErrors, setBidErrors] = useState({});
   const [submittingBidProductId, setSubmittingBidProductId] = useState(null);
   const [jumpPage, setJumpPage] = useState("1");
   const [favorites, setFavorites] = useState(new Set());
   const [togglingFavorite, setTogglingFavorite] = useState(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const validateSession = async () => {
-      try {
-        const user = await fetchCurrentUser();
-        if (isMounted) {
-          setCurrentUser(user);
-        }
-      } catch {
-        clearAuthSession();
-        if (isMounted) {
-          navigate("/login");
-        }
-      } finally {
-        if (isMounted) {
-          setIsCheckingSession(false);
-        }
-      }
-    };
-
-    validateSession();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [navigate]);
+  const [flashedProductIds, setFlashedProductIds] = useState(new Set());
+  const seenBidIdsRef = useRef(new Set());
 
   useEffect(() => {
     if (!currentUser) return;
 
     const loadFavorites = async () => {
-      const session = getAuthSession();
-      if (!session?.token) return;
-
       try {
-        const response = await fetch("http://localhost:8080/api/favorites", {
-          headers: {
-            Authorization: `Bearer ${session.token}`,
-          },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const favoriteIds = new Set(data.map(fav => fav.productId));
-          setFavorites(favoriteIds);
-        }
+        const data = await api.get("/api/favorites", { auth: true });
+        const favoriteIds = new Set(data.map((fav) => fav.productId));
+        setFavorites(favoriteIds);
       } catch (error) {
         console.error("Error al cargar favoritos:", error);
       }
@@ -111,20 +77,23 @@ export default function Home() {
     let isMounted = true;
 
     const loadProducts = async () => {
-      try {
-        const response = await fetch("http://localhost:8080/api/products");
-        const data = await response.json().catch(() => []);
+      setIsLoadingProducts(true);
+      setLoadError("");
 
-        if (!response.ok) {
-          throw new Error("No se pudieron cargar los productos");
-        }
+      try {
+        const data = await api.get(`/api/products?status=${statusFilter}`);
 
         if (isMounted) {
           setProducts(Array.isArray(data) ? data : []);
         }
-      } catch {
+      } catch (error) {
         if (isMounted) {
           setProducts([]);
+          setLoadError(
+            error instanceof TypeError
+              ? "No se pudo conectar con el servidor. Comprueba que el backend esté en marcha (puerto 8080)."
+              : error.message || "No se pudieron cargar los productos"
+          );
         }
       } finally {
         if (isMounted) {
@@ -138,7 +107,7 @@ export default function Home() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [statusFilter]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -156,14 +125,16 @@ export default function Home() {
   }, [currentUser?.id, itemsPerPage]);
 
   const refreshProducts = async () => {
-    const response = await fetch("http://localhost:8080/api/products");
-    const data = await response.json().catch(() => []);
-
-    if (!response.ok) {
-      throw new Error("No se pudieron cargar los productos");
-    }
-
+    const data = await api.get(`/api/products?status=${statusFilter}`);
     setProducts(Array.isArray(data) ? data : []);
+  };
+
+  const requireAuthForAction = () => {
+    if (!getAuthSession()?.token) {
+      navigate("/login", { state: { from: { pathname: "/home" } } });
+      return false;
+    }
+    return true;
   };
 
   const handleBidAmountChange = (productId, value) => {
@@ -174,11 +145,10 @@ export default function Home() {
   const handlePlaceBid = async (event, product) => {
     event.preventDefault();
 
-    const session = getAuthSession();
-    if (!session?.token) {
+    if (!requireAuthForAction()) {
       setBidErrors((prev) => ({
         ...prev,
-        [product.id]: "Tu sesión ha caducado, vuelve a iniciar sesión",
+        [product.id]: "Inicia sesión para pujar",
       }));
       return;
     }
@@ -198,23 +168,11 @@ export default function Home() {
     setBidErrors((prev) => ({ ...prev, [product.id]: "" }));
 
     try {
-      const response = await fetch(
-        `http://localhost:8080/api/products/${product.id}/bids`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.token}`,
-          },
-          body: JSON.stringify({ amount: parsedAmount }),
-        }
+      await api.post(
+        `/api/products/${product.id}/bids`,
+        { amount: parsedAmount },
+        { auth: true }
       );
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data.message || "No se pudo registrar la puja");
-      }
 
       setBidAmounts((prev) => ({ ...prev, [product.id]: "" }));
       await refreshProducts();
@@ -229,32 +187,29 @@ export default function Home() {
   };
 
   const toggleFavorite = async (productId) => {
-    const session = getAuthSession();
-    if (!session?.token) return;
+    if (!requireAuthForAction()) {
+      return;
+    }
 
     setTogglingFavorite(productId);
     const isFavorite = favorites.has(productId);
 
     try {
-      const method = isFavorite ? "DELETE" : "POST";
-      const response = await fetch(`http://localhost:8080/api/favorites/${productId}`, {
-        method: method,
-        headers: {
-          Authorization: `Bearer ${session.token}`,
-        },
-      });
-
-      if (response.ok) {
-        setFavorites(prev => {
-          const newFavorites = new Set(prev);
-          if (isFavorite) {
-            newFavorites.delete(productId);
-          } else {
-            newFavorites.add(productId);
-          }
-          return newFavorites;
-        });
+      if (isFavorite) {
+        await api.delete(`/api/favorites/${productId}`, { auth: true });
+      } else {
+        await api.post(`/api/favorites/${productId}`, undefined, { auth: true });
       }
+
+      setFavorites((prev) => {
+        const newFavorites = new Set(prev);
+        if (isFavorite) {
+          newFavorites.delete(productId);
+        } else {
+          newFavorites.add(productId);
+        }
+        return newFavorites;
+      });
     } catch (error) {
       console.error("Error al actualizar favorito:", error);
     } finally {
@@ -388,6 +343,50 @@ export default function Home() {
     setJumpPage(String(safeCurrentPage));
   }, [safeCurrentPage]);
 
+  const visibleProductIds = useMemo(
+    () => paginatedProducts.map((product) => product.id),
+    [paginatedProducts]
+  );
+
+  useProductRealtime({
+    productIds: visibleProductIds,
+    enabled: visibleProductIds.length > 0,
+    onBid: (productId, bid) => {
+      if (bid.id && seenBidIdsRef.current.has(bid.id)) {
+        return;
+      }
+      if (bid.id) {
+        seenBidIdsRef.current.add(bid.id);
+      }
+
+      const amount = Number(bid.amount);
+      if (!Number.isFinite(amount)) {
+        return;
+      }
+
+      setProducts((prev) =>
+        prev.map((product) =>
+          product.id === productId
+            ? {
+                ...product,
+                currentPrice: amount,
+                bidsCount: (product.bidsCount || 0) + 1,
+              }
+            : product
+        )
+      );
+
+      setFlashedProductIds((prev) => new Set(prev).add(productId));
+      window.setTimeout(() => {
+        setFlashedProductIds((prev) => {
+          const next = new Set(prev);
+          next.delete(productId);
+          return next;
+        });
+      }, 2500);
+    },
+  });
+
   const handleJumpPageSubmit = (event) => {
     event.preventDefault();
 
@@ -401,14 +400,6 @@ export default function Home() {
     setCurrentPage(targetPage);
     setJumpPage(String(targetPage));
   };
-
-  if (isCheckingSession) {
-    return (
-      <div className="main-content d-flex justify-content-center align-items-center">
-        <p className="text-muted mb-0">Comprobando sesión...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="main-content">
@@ -529,6 +520,12 @@ export default function Home() {
           )}
         </div>
 
+        {loadError && (
+          <div className="alert alert-danger" role="alert">
+            {loadError}
+          </div>
+        )}
+
         {isLoadingProducts ? (
           <p className="text-muted text-center">Cargando productos...</p>
         ) : sortedProducts.length === 0 ? (
@@ -546,7 +543,10 @@ export default function Home() {
 
               return (
                 <div className="col-md-6 col-lg-4" key={product.id}>
-                  <div className="card h-100 border-0 shadow-sm rounded-4" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>
+                  <div
+                    className={`card h-100 border-0 shadow-sm rounded-4 ${flashedProductIds.has(product.id) ? "bid-flash" : ""}`}
+                    style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+                  >
                     {product.imageUrl && (
                       <img 
                         src={product.imageUrl} 
@@ -622,19 +622,19 @@ export default function Home() {
                           className="btn btn-link p-0 text-decoration-none d-flex align-items-center gap-1"
                           style={{ color: 'var(--text-primary)' }}
                           title="Comentarios"
-                          onClick={() => {
-                            setTimeout(() => {
-                              const element = document.getElementById('comments-section');
-                              if (element) {
-                                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                              }
-                            }, 100);
-                          }}
                         >
                           <i className="bi bi-chat fs-5"></i>
                           {product.commentsCount > 0 && (
                             <span className="small">{product.commentsCount}</span>
                           )}
+                        </Link>
+                        <Link
+                          to={`/products/${product.id}#chat-section`}
+                          className="btn btn-link p-0 text-decoration-none"
+                          style={{ color: 'var(--text-primary)' }}
+                          title="Chat en vivo"
+                        >
+                          <i className="bi bi-chat-dots fs-5"></i>
                         </Link>
                         <button
                           className="btn btn-link p-0 text-decoration-none"

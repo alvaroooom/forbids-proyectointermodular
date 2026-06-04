@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -26,4 +27,8 @@ public interface FavoriteRepository extends JpaRepository<Favorite, Long> {
 
     @Query("SELECT COUNT(f) FROM Favorite f WHERE f.user = :user")
     long countByUser(com.forbids.model.User user);
+
+    @Modifying
+    @Query("DELETE FROM Favorite f WHERE f.product.id = :productId")
+    void deleteByProductId(Long productId);
 }

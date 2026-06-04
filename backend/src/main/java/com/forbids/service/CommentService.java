@@ -2,6 +2,9 @@ package com.forbids.service;
 
 import com.forbids.dto.CommentResponse;
 import com.forbids.dto.CreateCommentRequest;
+import com.forbids.exception.BadRequestException;
+import com.forbids.exception.ForbiddenException;
+import com.forbids.exception.NotFoundException;
 import com.forbids.model.Comment;
 import com.forbids.model.Product;
 import com.forbids.model.User;
@@ -32,38 +35,29 @@ public class CommentService {
     @Transactional(readOnly = true)
     public List<CommentResponse> getCommentsByProduct(Long productId) {
         Product product = productRepository.findById(productId)
-            .orElseThrow(() -> new RuntimeException("Producto no encontrado"));
+            .orElseThrow(() -> new NotFoundException("Producto no encontrado"));
 
-        List<Comment> comments = commentRepository.findAllByProductOrderByCreatedAtDesc(product);
-
-        return comments.stream()
+        return commentRepository.findAllByProductOrderByCreatedAtDesc(product)
+            .stream()
             .map(this::toResponse)
             .collect(Collectors.toList());
     }
 
     @Transactional
     public CommentResponse createComment(Long productId, Long userId, CreateCommentRequest request) {
-        if (request.getContent() == null || request.getContent().trim().isEmpty()) {
-            throw new RuntimeException("El comentario no puede estar vacío");
-        }
-
-        if (request.getContent().length() > 1000) {
-            throw new RuntimeException("El comentario no puede tener más de 1000 caracteres");
-        }
-
         Product product = productRepository.findById(productId)
-            .orElseThrow(() -> new RuntimeException("Producto no encontrado"));
+            .orElseThrow(() -> new NotFoundException("Producto no encontrado"));
 
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+            .orElseThrow(() -> new NotFoundException("Usuario no encontrado"));
 
         Comment parentComment = null;
         if (request.getParentCommentId() != null) {
             parentComment = commentRepository.findById(request.getParentCommentId())
-                .orElseThrow(() -> new RuntimeException("Comentario padre no encontrado"));
+                .orElseThrow(() -> new NotFoundException("Comentario padre no encontrado"));
 
             if (!parentComment.getProduct().getId().equals(productId)) {
-                throw new RuntimeException("Solo puedes responder comentarios del mismo producto");
+                throw new BadRequestException("Solo puedes responder comentarios del mismo producto");
             }
         }
 
@@ -74,16 +68,20 @@ public class CommentService {
     }
 
     @Transactional
-    public void deleteComment(Long commentId, Long userId) {
+    public void deleteComment(Long productId, Long commentId, Long userId) {
         Comment comment = commentRepository.findById(commentId)
-            .orElseThrow(() -> new RuntimeException("Comentario no encontrado"));
+            .orElseThrow(() -> new NotFoundException("Comentario no encontrado"));
+
+        if (!comment.getProduct().getId().equals(productId)) {
+            throw new NotFoundException("Comentario no encontrado");
+        }
 
         if (!comment.getUser().getId().equals(userId)) {
-            throw new RuntimeException("No tienes permiso para eliminar este comentario");
+            throw new ForbiddenException("No tienes permiso para eliminar este comentario");
         }
 
         if (commentRepository.countByParentComment(comment) > 0) {
-            throw new RuntimeException("No puedes eliminar un comentario que tiene respuestas");
+            throw new BadRequestException("No puedes eliminar un comentario que tiene respuestas");
         }
 
         commentRepository.delete(comment);

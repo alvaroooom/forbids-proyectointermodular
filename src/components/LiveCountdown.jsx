@@ -6,7 +6,7 @@ export default function LiveCountdown({ endDate, isClosed, size = 'md', showIcon
     calculateTimeRemaining(endDate)
   );
 
-  useEffect(() => {lo 
+  useEffect(() => {
     if (isClosed) {
       return;
     }
