@@ -12,7 +12,12 @@
     "type": "git",
     "url": "git+https://github.com/alvaroooom/forbids-proyectointermodular.git"
   },
-  "keywords": ["subastas", "marketplace", "react", "spring-boot"],
+  "keywords": [
+    "subastas",
+    "marketplace",
+    "react",
+    "spring-boot"
+  ],
   "author": "Álvaro Muñoz Fernández",
   "license": "ISC",
   "bugs": {
@@ -20,6 +25,7 @@
   },
   "homepage": "https://github.com/alvaroooom/forbids-proyectointermodular#readme",
   "dependencies": {
+    "@popperjs/core": "^2.11.8",
     "@stomp/stompjs": "^7.3.0",
     "bootstrap": "^5.3.8",
     "react": "^18.2.0",
